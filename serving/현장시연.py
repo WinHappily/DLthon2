@@ -341,7 +341,7 @@ def main():
             run(q.strip())
         return
     print(f"\n준비 완료. 모델 {mid} · 문서 {','.join(docs)}")
-    print("질문을 입력하세요. 명령: :1 :2 :3 시연 질문 · :model <ID> · :docs V3 · :q 끝 (Ctrl+Z는 쓰지 마세요)")
+    print("질문을 입력하세요. 명령: :1 :2 :3 시연 질문 · :all 시연 질문 3개 · :both 31B→12B로 3개씩 · :model <ID> · :q 끝 (Ctrl+Z는 쓰지 마세요)")
     while True:
         try:
             try:  # 답을 기다리는 동안 눌린 키는 버린다 (다음 질문에 섞여 들어가지 않게)
@@ -356,6 +356,19 @@ def main():
             continue
         if q.strip(":") in ("q", "quit", "exit"):
             break
+        if q in (":all", ":both"):
+            # :all = 지금 모델로 시연 질문 3개, :both = 31B로 3개 → 12B로 바꿔 3개 (손대지 않아도 끝까지 간다, 약 5분)
+            plan = [mid] if q == ":all" else ["gemma4-31b-qat", "gemma4-12b-qat"]
+            for m_ in plan:
+                if m_ != mid:
+                    if not ensure_server(m_):
+                        break
+                    mid = m_
+                print(f"\n{B}════════ 모델 {mid} : 시연 질문 3개 ════════{X}")
+                for k in ("2", "1", "3"):
+                    run(k)
+            print(f"\n{G}{B}끝. 지금 모델: {mid}{X}")
+            continue
         if q.startswith(":model"):
             new = q.split(maxsplit=1)[1].strip() if len(q.split()) > 1 else ""
             if new and ensure_server(new):
