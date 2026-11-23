@@ -7,3 +7,4 @@ results/
 # 벡터는 GPU에서 rag.index --embed 로 만든다 (emb_meta.json 만 있으면 Searcher 가 emb.npy 를 찾다 실패)
 data/*/emb.npy
 data/*/emb_meta.json
+data/*/qemb.npz

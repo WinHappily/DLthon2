@@ -21,7 +21,9 @@ import json
 import time
 import urllib.request
 
+from rag.brief import brief_text, build_brief
 from rag.common import ROOT
+from rag.prompt import build_messages
 from rag.search import Searcher
 
 DEFAULT_Q = "10월 15일에 시어머니 생신 선물 15만 원과 식사 7만 원을 서로 다른 카드로 결제할 예정이야. 월 잔액은 충분해. 공동비로 처리할 수 있어?"
@@ -77,17 +79,20 @@ def main():
     ap.add_argument("--max-tokens", type=int, default=400)
     ap.add_argument("--timeout", type=int, default=300)
     ap.add_argument("--dry-run", action="store_true", help="서버에 보내지 않고 프롬프트만 출력")
+    ap.add_argument("--no-brief", action="store_true", help="판정 메모 빼기 (비교용)")
+    ap.add_argument("--old-prompt", action="store_true", help="11.17 다섯 줄 프롬프트 (비교용)")
     a = ap.parse_args()
 
     s = Searcher(a.doc)
+    res = s.retrieve(a.question, k=a.k, max_refs=a.max_refs)
     if a.pages:
-        hits, version = [s._hit(p, 0.0, ["직접 지정"], []) for p in a.pages], None
-        from rag.version import decide
-        version = decide(a.question, s.cfg, a.doc)
+        res["hits"] = [s._hit(p, 0.0, ["직접 지정"], []) for p in a.pages]
+    hits, version = res["hits"], res["version"]
+    if a.old_prompt:      # 11.17 프롬프트 (판정 메모 · 이유 줄 없음) : 비교용
+        msgs = build_prompt(a.question, hits, version)
     else:
-        res = s.retrieve(a.question, k=a.k, max_refs=a.max_refs)
-        hits, version = res["hits"], res["version"]
-    msgs = build_prompt(a.question, hits, version)
+        bt = None if a.no_brief else brief_text(build_brief(s, res))
+        msgs = build_messages(a.question, res, bt)
     chars = sum(len(m["content"]) for m in msgs)
     expect = a.expect or (DEFAULT_EXPECT if a.question == DEFAULT_Q else "")
 
@@ -95,7 +100,7 @@ def main():
     print(f"[붙인 쪽] {[h['page'] for h in hits]}  (프롬프트 {chars:,}자)")
     print(f"[판본 규칙] {version['status']} · {version.get('label') or version['applied_version']} · {version['reason']}")
     if a.dry_run:
-        print("\n" + msgs[1]["content"])
+        print("\n" + msgs[-1]["content"][-2500:])   # 마지막 사용자 메시지 끝부분 (판정 메모 + 질문)
         return
 
     data = chat(a.base_url, a.model, msgs, a.max_tokens, a.timeout)
@@ -112,6 +117,7 @@ def main():
         f.write(json.dumps({"time": time.strftime("%Y-%m-%d %H:%M:%S"), "model": a.model, "doc": a.doc,
                             "question": a.question, "pages": [h["page"] for h in hits],
                             "version": version, "sec": round(data["_sec"], 2), "usage": usage,
+                            "prompt": "old" if a.old_prompt else ("no-brief" if a.no_brief else "brief"),
                             "answer": ans, "expect": expect}, ensure_ascii=False) + "\n")
     print(f"-> {out}")
 

@@ -86,11 +86,11 @@
 | 폴더 | 내용 | 담당 |
 | --- | --- | --- |
 | [`regulations/`](regulations) | 배포된 규약집 V2(1일차) · V3(4일차) · 개정 안내 | 운영진 배포 |
-| [`retrieval/`](retrieval) | PDF 추출, 쪽 단위 청크 + 꼬리표, 표 행 보조 청크, bge-m3 색인 · 검색, 판본 규칙, 검색 평가 | A |
-| [`serving/`](serving) | vLLM 일괄 실행기 `run_all.py`, 지시문 p3, 출력 스키마, 채점, 교사 답 생성 · LoRA 학습 · 병합 스크립트 | B |
+| [`retrieval/`](retrieval) | 질문 정리, PDF 추출, 쪽 · 표 행 조각, BM25 + bge-m3 검색, **판본 규칙 g3.3**, 판정 메모, 검색 결과 내보내기, 검색 · 판본 평가 (A 최종 공개판 + V2 추출본) | A |
+| [`serving/`](serving) | vLLM 일괄 실행기 `run_all.py`, 지시문 p3, 출력 스키마, 채점, 개발 · 잡음 · 형식 문항과 검색 결과, 교사 답 생성 · LoRA 학습 · 병합, 공개 · 봉인 실행 스크립트 | B · C |
 | [`distill/`](distill) | 증류 학습 질문 생성, 평가 세트와의 겹침 검사, 채점을 통과한 교사 답 목록 | C |
-| [`eval/`](eval) | 공개 100 · 봉인 50 실행과 채점, 판본 규칙을 끈 분석 실행 | C |
-| [`data/`](data) | 개발 150 · 잡음 90 · 형식 30 · 단문 15 · V3 쌍 16 문항과 정답(V2 · V3), 검수표, 증류 학습 질문, V3 검색 결과 | A · C |
+| [`eval/`](eval) | 공개 100 · 봉인 50 평가 절차와 스크립트 설명(스크립트는 `serving/`) | C |
+| [`data/`](data) | 개발 150 · 잡음 90 · 형식 30 · 단문 15 · V3 쌍 16 문항과 정답(V2 · V3), 검수표, 증류 학습 질문, A 검색 원본(V3) | A · C |
 | [`results/`](results) | 채점 요약표, 모델 출력 원본(개발 · 잡음 · 형식 · 교사 답), 서버 로그 | B · C |
 | [`docs/`](docs) | 발표 자료, 실험 기록, 설계, 평가 규격, 그림 | C |
 
@@ -115,7 +115,7 @@ python merge_lora.py /workspace/models/qwen3-4b-instruct-2507 /workspace/lora_qw
 bash 평가_실행.sh qwen3-4b-lora - 모두
 ```
 
-- 검색 결과 파일은 `retrieval/notebooks/role_A_colab.ipynb`로 만들어 `serving/data/`에 넣습니다. V3 개발 세트용 검색 결과는 `data/retrieval_V3/`에 압축해 두었습니다.
+- 개발 150 · 잡음 90 · 형식 30의 검색 결과(V2 · V3, 오라클 조건 포함)는 `serving/data/`에 들어 있어 **GPU만 있으면 바로 평가를 재현**할 수 있습니다. 새 질문의 검색 결과는 `retrieval/`의 `python -m scripts.export_retrieval`(또는 Colab 노트북)로 만들고 `serving/convert_a.py`로 변환합니다.
 - vLLM은 직접 띄우지 않습니다. `run_all.py`가 모델마다 서버를 띄우고 끕니다. 두 개를 동시에 띄우지 않습니다.
 - 세부 실행 방법은 승환 님 인수인계 문서 [serving/읽어주세요_인수인계_B.md](serving/읽어주세요_인수인계_B.md)를 참고하세요.
 
@@ -136,7 +136,8 @@ bash 평가_실행.sh qwen3-4b-lora - 모두
 2. 쪽 단위 청크 + 꼬리표(문서 판본 · 쪽 · 조항 · 표 · 개정 항목 여부)
 3. 표의 각 행은 열 이름을 붙인 문장으로 바꿔 보조 청크로 분리
 4. bge-m3 임베딩으로 색인, 재순위 후 청크 안의 '제N조 · 표 NN'을 한 단계 따라가 함께 가져옴
-5. V2 합본과 V3 합본은 색인을 따로 만들고, 개정 비교 때 색인만 바꿔 끼움 (V3는 `python -m scripts.add_version --doc V3 --pdf <PDF> --write`로 판본 구간 추가)
+5. 검색할 때는 질문을 먼저 정리(NFKC · 이모지 · 잡담 정리, `rag/query.py`)하고, BM25와 bge-m3 결과를 RRF로 합친 뒤 판정 메모(금액 합산 · 판본별 수치 · 맞은 표 행, `rag/brief.py`)를 붙임
+6. V2 합본과 V3 합본은 색인을 따로 만들고, 개정 비교 때 색인만 바꿔 끼움 (V3는 `python -m scripts.add_version --doc V3 --pdf <PDF> --write`로 판본 구간 추가)
 
 V2 추출 · 색인 산출물(페이지 · 청크 · 표 행 · 조항-쪽 대응, 추출 보고)은 [`retrieval/data/V2/`](retrieval/data/V2)에 있습니다.
 
