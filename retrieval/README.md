@@ -10,7 +10,7 @@
 | `eval/` | 검색 품질(정답 조항 상위 k 포함률) · 판본 규칙 정확도 평가 |
 | `notebooks/role_A_colab.ipynb` | Colab에서 색인을 만들고 평가 · 학습용 검색 결과 파일을 내보내는 노트북 |
 
-이 폴더는 팀 공유 시점의 A 저장소 사본이다. 최종 판본 규칙 g3.3과 V3 색인 산출물은 Colab에서 만들었고, 그 결과(검색 결과 파일)는 `../data/retrieval_V3/`에 있다.
+이 폴더는 팀 공유 시점의 A 저장소 사본이다. 원래 README의 경로는 이 폴더 기준이다(`data/V2/`, `eval/`). 규약집 PDF는 `pdf/rulebook_V2.pdf`처럼 두라고 되어 있는데, 배포 원본은 `../regulations/`에 있다. 최종 판본 규칙 g3.3과 V3 색인 산출물은 Colab에서 만들었고, 그 결과(검색 결과 파일)는 `../data/retrieval_V3/`에 있다.
 
 ---
 
