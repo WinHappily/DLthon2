@@ -138,6 +138,17 @@ def r3(question, o):
         return "사전 합의 필요"
     return None
 
+# ---------------------------------------------------------------- 화면 설명 문구
+
+DOC_ROLE = {"V2": "· 개정 전 규약집, 비교용", "V3": "· 최신 규약집(12/1 개정 반영), 최종 답"}
+STATE_MEAN = {"가능": "지금 상태로 진행·공동비 처리 가능",
+              "사전 합의 필요": "상대와 미리 합의하면 가능",
+              "추가 확인": "결론을 가를 정보가 없어 되물음",
+              "공동 처리 불가": "규약상 안 됨(개인 부담·진행 불가)",
+              "규정에 없음": "규약이 다루지 않는 질문"}
+VER_MEAN = {"V1": "6/1~9/30 사건 → V1 규칙", "V2": "10/1~11/30 사건 → V2 규칙", "V3": "12/1 이후 사건 → V3 규칙",
+            "해당 없음": "개정된 항목이 아니라 판본 무관", "미정": "판본을 가를 날짜가 질문에 없음"}
+
 # ---------------------------------------------------------------- 모델 서버
 
 def served_model():
@@ -207,7 +218,8 @@ def judge(question, doc, searcher, mid, cache, log):
     chunks, v = to_chunks(res["hits"]), to_version(res["version"])
     t_ret = time.perf_counter() - t0
 
-    print(f"\n{B}━━ {doc} 문서 ━━{X}")
+    role = DOC_ROLE.get(doc, "")
+    print(f"\n{B}━━ {doc} 문서{X} {D}{role}{X} {B}━━{X}")
     print(f"{B}① 검색{X} {D}({t_ret:.1f}초, 조각 {len(chunks)}개){X}")
     for c in chunks:
         print(f"   {c['출처']:<28} {c['쪽']:>3}쪽  {D}{c['경로'][:40]}{X}")
@@ -239,7 +251,10 @@ def judge(question, doc, searcher, mid, cache, log):
     print(f"   {B}판본{X}  {o.get('적용_판본')}" + (f"  {D}기준일 {o.get('기준일')}{X}" if o.get('기준일') else ""))
     cond = o.get("조건") or {}
     if any(cond.get(k) is not None for k in ("합산액", "상한")):
-        print(f"   {B}조건{X}  합산 {cond.get('합산액')}만 원 / 상한 {cond.get('상한')}만 원 · 사전 합의 {cond.get('사전_합의')}")
+        parts = [f"합산 {cond['합산액']}만 원" if cond.get("합산액") is not None else "",
+                 f"상한 {cond['상한']}만 원" if cond.get("상한") is not None else "",
+                 f"사전 합의 {cond['사전_합의']}" if cond.get("사전_합의") else ""]
+        print(f"   {B}조건{X}  " + " / ".join(p for p in parts if p))
     gs = "; ".join(f"{g.get('출처')}{' ' + g['행'] if g.get('행') else ''}{' (' + str(g['쪽']) + '쪽)' if g.get('쪽') else ''}" for g in (o.get("근거") or []))
     print(f"   {B}근거{X}  {gs or '-'}")
     print(f"   {B}답{X}    {o.get('답')}")
@@ -253,6 +268,32 @@ def judge(question, doc, searcher, mid, cache, log):
                           "검색_조각": [{"출처": c["출처"], "쪽": c["쪽"]} for c in chunks], "출력_원문": text,
                           "R3_상태": new, "응답_시간_초": round(total, 2)}, ensure_ascii=False) + "\n")
     log.flush()
+    return {"상태": new or state, "모델_상태": state, "판본": o.get("적용_판본"), "답": o.get("답"),
+            "다음_행동": o.get("다음_행동"), "되묻기": o.get("추가_확인_질문"), "시간": total}
+
+
+def conclude(out):
+    """두 문서 결과를 한 상자로 요약한다. 최종 답 = 최신 규약집(V3 문서) 결과"""
+    final_doc = "V3" if out.get("V3") else next((d for d in out if out[d]), None)
+    if not final_doc:
+        return
+    f = out[final_doc]
+    line = "─" * 64
+    print(f"\n{G}{line}{X}")
+    print(f"{G}{B}[결론] 최종 답 = {final_doc} 문서(최신 규약집) 기준{X}")
+    print(f"   {B}판정{X}      {Y}{B}{f['상태']}{X}   {D}{STATE_MEAN.get(f['상태'], '')}{X}")
+    print(f"   {B}적용 판본{X} {f['판본']}   {D}{VER_MEAN.get(f['판본'], '사건 날짜로 고른 규칙 판본')}{X}")
+    print(f"   {B}답{X}        {f['답']}")
+    if f.get("되묻기"):
+        print(f"   {B}되묻기{X}    {f['되묻기']}")
+    print(f"   {B}할 일{X}     {f['다음_행동']}")
+    others = [d for d in out if d != final_doc and out[d]]
+    for d in others:
+        o = out[d]
+        same = "같음" if o["상태"] == f["상태"] else "달라짐"
+        print(f"   {D}비교: 개정 전 규약집({d} 문서)이라면 '{o['상태']}' → 최신과 {same}"
+              + (" (개정으로 결론이 바뀌는 질문)" if same == "달라짐" else "") + f"{X}")
+    print(f"{G}{line}{X}")
 
 
 def main():
@@ -290,8 +331,10 @@ def main():
         if re.fullmatch(r"[:\s123]*[123][:\s123]*", q) and (":" in q or len(q) == 1):  # ':2', '::1', ':2:2' 처럼 겹쳐 들어와도 시연 질문으로
             q = PRESETS[re.findall(r"[123]", q)[-1]]
         print(f"\n{B}질문{X} {q}")
-        for d in docs:
-            judge(q, d, searchers[d], mid, cache, log)
+        if len(docs) > 1:
+            print(f"{D}  → 같은 질문을 개정 전 규약집(V2 문서)과 최신 규약집(V3 문서)에 각각 물어 비교합니다. 최종 답은 맨 아래 [결론]{X}")
+        out = {d: judge(q, d, searchers[d], mid, cache, log) for d in docs}
+        conclude(out)
 
     if a.ask:
         for q in a.ask.split("|"):
