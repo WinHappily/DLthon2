@@ -28,6 +28,11 @@ import subprocess
 import sys
 import time
 
+try:
+    import readline  # 화살표 · 지우기 키가 ^[[A 같은 글자로 찍히지 않게
+except ImportError:
+    pass
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAG_DIR = os.path.join(HERE, "..", "retrieval")
 sys.path.insert(0, HERE)
@@ -282,7 +287,8 @@ def main():
     log = open(os.path.join(HERE, "results", "현장시연.jsonl"), "a", encoding="utf-8")
 
     def run(q):
-        q = PRESETS.get(q.lstrip(":"), q) if re.fullmatch(r":?[123]", q) else q
+        if re.fullmatch(r"[:\s123]*[123][:\s123]*", q) and (":" in q or len(q) == 1):  # ':2', '::1', ':2:2' 처럼 겹쳐 들어와도 시연 질문으로
+            q = PRESETS[re.findall(r"[123]", q)[-1]]
         print(f"\n{B}질문{X} {q}")
         for d in docs:
             judge(q, d, searchers[d], mid, cache, log)
@@ -292,15 +298,20 @@ def main():
             run(q.strip())
         return
     print(f"\n준비 완료. 모델 {mid} · 문서 {','.join(docs)}")
-    print("질문을 입력하세요. 명령: :1 :2 :3 시연 질문 · :model <ID> · :docs V3 · :q 끝")
+    print("질문을 입력하세요. 명령: :1 :2 :3 시연 질문 · :model <ID> · :docs V3 · :q 끝 (Ctrl+Z는 쓰지 마세요)")
     while True:
         try:
+            try:  # 답을 기다리는 동안 눌린 키는 버린다 (다음 질문에 섞여 들어가지 않게)
+                import termios
+                termios.tcflush(sys.stdin, termios.TCIFLUSH)
+            except Exception:
+                pass
             q = input(f"\n{B}질문>{X} ").strip()
         except (EOFError, KeyboardInterrupt):
             break
         if not q:
             continue
-        if q in (":q", ":quit", "exit"):
+        if q.strip(":") in ("q", "quit", "exit"):
             break
         if q.startswith(":model"):
             new = q.split(maxsplit=1)[1].strip() if len(q.split()) > 1 else ""
