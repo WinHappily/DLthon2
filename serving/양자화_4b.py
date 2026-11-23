@@ -23,7 +23,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 SRC = "/workspace/models/qwen3-4b-lora"
 OUT = "/workspace/models/qwen3-4b-lora-w4a16"
-N, MAXLEN = 128, 8192
+N = int(os.environ.get("CALIB_N", 128))          # 보정 대화 수 (빨리 해 볼 때 32)
+MAXLEN = int(os.environ.get("CALIB_LEN", 8192))  # 대화당 최대 토큰 (빨리 해 볼 때 4096)
 
 sft = sys.argv[1] if len(sys.argv) > 1 else None
 if not sft:
