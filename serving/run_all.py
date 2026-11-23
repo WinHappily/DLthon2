@@ -58,6 +58,8 @@ MODELS = {
     "qwen3-4b-prune8": [[]],
     # 증류 결과(merge_lora.py로 합친 폴더 /workspace/models/qwen3-4b-lora)
     "qwen3-4b-lora": [[]],
+    # 11/23: 증류 4B를 GPTQ 4비트로 줄인 것(양자화_4b.py)
+    "qwen3-4b-lora-w4a16": [[]],
 }
 
 # 전 모델 공통 서버 설정. 응답 시간·메모리 비교를 위해 같게 둔다.
