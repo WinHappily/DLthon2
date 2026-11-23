@@ -1,0 +1,5 @@
+pdfplumber>=0.11
+rank_bm25>=0.2.2
+numpy>=1.26,<2.3
+# 의미 검색(벡터)을 쓸 때만 : RunPod · 코랩 GPU
+# sentence-transformers>=3.0
