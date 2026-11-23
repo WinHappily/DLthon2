@@ -125,6 +125,14 @@ python make_sft.py results/results_TEACHp3_860_V3.jsonl gemma4-31b-qat data/문�
 python train_lora.py data/sft_V3.jsonl /workspace/models/qwen3-4b-instruct-2507 /workspace/lora_qwen3-4b
 python merge_lora.py /workspace/models/qwen3-4b-instruct-2507 /workspace/lora_qwen3-4b /workspace/models/qwen3-4b-lora
 bash 평가_실행.sh qwen3-4b-lora - 모두
+
+# 2-1) 학습을 건너뛰고 공개한 어댑터로 바로 평가 (serving/에서)
+curl -LO https://github.com/WinHappily/DLthon2/releases/download/v1.0/qwen3-4b-lora-adapter.zip
+python -c "import zipfile; zipfile.ZipFile('qwen3-4b-lora-adapter.zip').extractall('/workspace')"
+python -c "from huggingface_hub import snapshot_download as s; s('Qwen/Qwen3-4B-Instruct-2507', local_dir='/workspace/models/qwen3-4b-instruct-2507')"
+pip install peft
+python merge_lora.py /workspace/models/qwen3-4b-instruct-2507 /workspace/qwen3-4b-lora-adapter /workspace/models/qwen3-4b-lora
+bash 평가_실행.sh qwen3-4b-lora - 모두
 ```
 
 - 개발 150 · 잡음 90 · 형식 30의 검색 결과(V2 · V3, 오라클 조건 포함)는 `serving/data/`에 들어 있어 **GPU만 있으면 바로 평가를 재현**할 수 있습니다. 새 질문의 검색 결과는 `retrieval/`의 `python -m scripts.export_retrieval`(또는 Colab 노트북)로 만들고 `serving/convert_a.py`로 변환합니다.
@@ -139,6 +147,7 @@ bash 평가_실행.sh qwen3-4b-lora - 모두
 | 주력 | `google/gemma-4-12B-it-qat-w4a16-ct` + 후처리 R3 |
 | 교사 / 참고 | `google/gemma-4-31B-it-qat-w4a16-ct` |
 | 학생 | `Qwen/Qwen3-4B-Instruct-2507` + LoRA(랭크 16 · alpha 32 · dropout 0.05 · 모든 선형층 · 학습률 1e-4 · 2에폭 · 최대 16,384토큰, 교사 답 746문항, A40 2시간 45분) |
+| 학습된 LoRA 어댑터 | [Release v1.0 · qwen3-4b-lora-adapter.zip](https://github.com/WinHappily/DLthon2/releases/tag/v1.0) (124MB, `adapter_model.safetensors` SHA-256 앞 16자리 `a678d8d3bc93b579`) |
 
 생성 설정: temperature 0 · seed 0 · 추론 모드 끔 · JSON 스키마 강제 · 최대 출력 1,536토큰(형식 · 공개 · 봉인 2,048) · 최대 문맥 32,768 · GPU 메모리 90% · 동시 8요청.
 
@@ -156,4 +165,5 @@ V2 추출 · 색인 산출물(페이지 · 청크 · 표 행 · 조항-쪽 대�
 ## 넣지 않은 것
 
 - 운영진 평가 키트(공개 100 · 최종 평가)의 질문과 정답, 팀장이 보관한 봉인 50 문항과 정답: 평가용 비공개 자료라 제외했습니다. 점수는 [results/](results)와 [docs/실험기록.md](docs/실험기록.md)에 있습니다.
-- 증류 학습용 검색 결과(파일당 약 40MB)와 LoRA 체크포인트: 위 재현 방법으로 다시 만들 수 있습니다.
+- 증류 학습용 검색 결과(파일당 약 40MB): 재현 방법의 증류 단계로 다시 만들 수 있습니다.
+- 학습된 LoRA 어댑터는 용량 때문에 저장소가 아니라 [Release v1.0](https://github.com/WinHappily/DLthon2/releases/tag/v1.0)에 있습니다.
