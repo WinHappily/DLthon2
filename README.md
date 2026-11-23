@@ -96,6 +96,18 @@
 
 ## 재현 방법
 
+**재현 확인 (2026-11-23)**: 새 RunPod 팟(A40)에서 이 저장소를 그대로 받아 점검 5문항을 돌려, 대회 때와 같은 결과(형식 5/5 · 주지표 5/5 · 평균 10.4초, 당시 10.2초)를 얻었습니다.
+
+```bash
+# 환경 준비 (새 팟 기준, 약 3분)
+pip install --ignore-installed PyJWT            # 팟 이미지의 PyJWT가 pip로 지워지지 않아 먼저 덮어씀
+pip install "vllm==0.34.0" huggingface_hub      # torch 2.14 · transformers 5.22가 함께 설치됨
+
+# 점검 5문항 (약 5분: 모델 받기 + 첫 실행 컴파일 포함)
+git clone https://github.com/WinHappily/DLthon2 && cd DLthon2/serving
+bash 평가_실행.sh qwen3-4b-instruct-2507 Qwen/Qwen3-4B-Instruct-2507 점검   # → results/평가_요약.md 의 CHECK5 줄이 5/5
+```
+
 ```bash
 # 0) 모델 받기 (gemma는 Hugging Face 라이선스 동의 필요, 토큰은 터미널에서만 export)
 export HF_TOKEN=...
