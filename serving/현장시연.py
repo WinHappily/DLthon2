@@ -231,7 +231,7 @@ def judge(question, doc, searcher, mid, cache, log):
     state = o.get("상태")
     shown = f"{Y}{new}{X} {D}(모델은 '{state}' → R3 후처리){X}" if new else f"{Y}{state}{X}"
     print(f"   {B}판정{X}  {shown}")
-    print(f"   {B}판본{X}  {o.get('적용_판본')}  {D}기준일 {o.get('기준일')}{X}")
+    print(f"   {B}판본{X}  {o.get('적용_판본')}" + (f"  {D}기준일 {o.get('기준일')}{X}" if o.get('기준일') else ""))
     cond = o.get("조건") or {}
     if any(cond.get(k) is not None for k in ("합산액", "상한")):
         print(f"   {B}조건{X}  합산 {cond.get('합산액')}만 원 / 상한 {cond.get('상한')}만 원 · 사전 합의 {cond.get('사전_합의')}")
@@ -256,7 +256,7 @@ def main():
     ap.add_argument("--docs", default="V2,V3", help="판정할 문서 (쉼표). 개정 전후 비교는 V2,V3")
     ap.add_argument("--build-index", action="store_true", help="V2 · V3 벡터 색인을 만든다(처음 한 번)")
     ap.add_argument("--gpu-index", action="store_true", help="색인을 GPU로 만든다(GPU가 비어 있을 때만)")
-    ap.add_argument("--ask", help="질문 하나만 판정하고 끝낸다 (:1 · :2 · :3도 됨)")
+    ap.add_argument("--ask", help="질문만 판정하고 끝낸다 (:1 · :2 · :3도 됨, 여러 개는 | 로 구분)")
     a = ap.parse_args()
 
     if a.build_index:
@@ -271,6 +271,8 @@ def main():
     print("검색 준비 중 (bge-m3 불러오기)…", flush=True)
     enc = Encoder() if any((ROOT / "data" / d / "emb.npy").exists() for d in ("V2", "V3")) else None
     searchers = {d: load_searcher(d, enc) for d in ("V2", "V3")}
+    for s in searchers.values():  # 첫 검색이 느리지 않게 미리 한 번 돌린다
+        s.retrieve("준비", k=1, max_refs=0)
     docs = a.docs.split(",")
     mid = a.model
     if not ensure_server(mid):
@@ -286,7 +288,8 @@ def main():
             judge(q, d, searchers[d], mid, cache, log)
 
     if a.ask:
-        run(a.ask)
+        for q in a.ask.split("|"):
+            run(q.strip())
         return
     print(f"\n준비 완료. 모델 {mid} · 문서 {','.join(docs)}")
     print("질문을 입력하세요. 명령: :1 :2 :3 시연 질문 · :model <ID> · :docs V3 · :q 끝")
